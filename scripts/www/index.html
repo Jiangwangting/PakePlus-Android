@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+<title>日历备注</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23B8503A'/%3E%3Crect x='7' y='9' width='18' height='16' rx='3' fill='%23FFFDF8'/%3E%3Crect x='7' y='9' width='18' height='5' rx='3' fill='%231B211E'/%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#FAF8F4;
+  --backdrop:#E9E6DF;
+  --card:#FFFFFF;
+  --ink:#1B211E;
+  --muted:#8A8C84;
+  --line:#E4E0D6;
+  --accent:#B8503A;
+  --green:#3E5E52;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{
+  background:var(--backdrop);
+  color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC","MiSans","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.app{
+  max-width:540px;width:100%;min-height:100dvh;margin:0 auto;
+  background:var(--paper);
+  display:flex;flex-direction:column;
+  padding:0 8px calc(76px + env(safe-area-inset-bottom));
+  padding-top:calc(10px + env(safe-area-inset-top));
+  position:relative;
+  overflow-x:hidden;
+  overscroll-behavior-y:contain;
+}
+@media (min-width:600px){
+  body{display:flex;justify-content:center;align-items:flex-start}
+  .app{min-height:auto;height:calc(100dvh - 32px);margin:16px 0;border-radius:22px;box-shadow:0 18px 50px rgba(30,28,24,.16);overflow:hidden}
+}
+
+/* ---------- 顶部月份条 ---------- */
+.head{display:flex;align-items:flex-end;justify-content:space-between;padding:6px 2px 0}
+.head-l{display:flex;align-items:baseline;gap:8px;min-width:0}
+.year{font-size:12px;letter-spacing:.14em;color:var(--muted);font-variant-numeric:tabular-nums}
+.month{font-size:32px;line-height:1.05;font-weight:650;letter-spacing:-.01em;margin:0}
+.head-r{display:flex;gap:6px}
+.navbtn{
+  width:44px;height:44px;border:1px solid var(--line);background:var(--card);
+  border-radius:12px;display:grid;place-items:center;color:var(--ink);
+  cursor:pointer;padding:0;transition:transform .12s ease,background .12s ease;
+}
+.navbtn:active{transform:scale(.94);background:#F1EEE6}
+.subline{display:flex;align-items:center;justify-content:space-between;padding:10px 2px 12px;gap:10px}
+.subline span{font-size:13px;color:var(--muted)}
+.todaybtn{
+  border:0;background:none;color:var(--accent);font:inherit;font-size:13px;
+  padding:6px 10px;border-radius:8px;cursor:pointer;font-weight:600;
+}
+.todaybtn:active{background:#F2E6E1}
+
+/* ---------- 星期行 ---------- */
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;padding-bottom:6px}
+.week div{text-align:center;font-size:12px;color:var(--muted);letter-spacing:.06em}
+.week div:last-child,.week div:nth-child(6){color:#B98A7C}
+
+/* ---------- 日历网格 ---------- */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  grid-auto-rows:minmax(66px,1fr);
+  gap:2px;flex:1;align-content:stretch;min-width:0;
+}
+.cell{
+  position:relative;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:10px;
+  min-height:66px;min-width:0;
+  padding:5px 1px 4px 2px;
+  display:flex;flex-direction:column;align-items:flex-start;
+  font:inherit;color:inherit;text-align:left;cursor:pointer;
+  overflow:hidden;
+  transition:transform .1s ease,border-color .15s ease;
+}
+.cell:active{transform:scale(.97)}
+.cell.other{background:#F5F2EA;border-color:#EDE9DF}
+.cell.other .dnum{opacity:.35}
+.cell.other .dnote{opacity:.4}
+.cell.wkend .dnum{color:#B0563F}
+.cell.today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.cell.today .dnum{background:var(--accent);color:#fff;border-radius:50%;width:22px;height:22px;display:grid;place-items:center;font-size:13px;margin:-3px 0 0 -2px}
+.dnum{font-size:15px;font-weight:600;line-height:19px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.dnote{
+  font-size:11.5px;line-height:1.3;color:var(--green);
+  margin-top:3px;width:100%;max-width:100%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:block;
+}
+.cell.hasnote:after{
+  content:"";position:absolute;top:5px;right:5px;width:4px;height:4px;border-radius:50%;
+  background:var(--green);opacity:.7;
+}
+
+/* ---------- 备忘列表视图 ---------- */
+.viewlist{display:none;flex-direction:column;gap:10px;flex:1;min-height:0}
+.tools{display:flex;gap:8px;align-items:center}
+.searchbox{flex:1;display:flex;align-items:center;gap:8px;background:var(--card);
+  border:1px solid var(--line);border-radius:11px;padding:0 10px;height:44px}
+.searchbox svg{flex:none;color:var(--muted)}
+.searchbox input{border:0;outline:0;background:none;font:inherit;font-size:16px;width:100%;color:var(--ink);min-width:0}
+.iconbtn{
+  width:44px;height:44px;flex:none;border:1px solid var(--line);background:var(--card);
+  border-radius:11px;display:grid;place-items:center;cursor:pointer;color:var(--ink);padding:0;
+}
+.iconbtn:active{background:#F1EEE6}
+.rows{display:flex;flex-direction:column;gap:8px;overflow-y:auto;padding-bottom:8px;flex:1;min-height:0;min-width:0}
+.rowwrap{position:relative;border-radius:12px;overflow:hidden;flex:none;background:transparent}
+.rowdel{position:absolute;right:0;top:0;bottom:0;display:flex}
+.delbtn{
+  width:82px;border:0;background:#B8503A;color:#fff;
+  font:inherit;font-size:15px;font-weight:650;cursor:pointer;padding:0;
+}
+.delbtn:active{background:#A3462F}
+.rowitem{
+  position:relative;
+  display:flex;gap:12px;align-items:flex-start;text-align:left;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:12px 13px;font:inherit;color:inherit;cursor:pointer;width:100%;
+  transform:translateX(0);
+  transition:transform .18s cubic-bezier(.2,.8,.2,1);
+  touch-action:pan-y;
+  will-change:transform;
+}
+.rowitem.open{transform:translateX(-82px)}
+.rowitem.dragging{transition:none}
+.rowitem:active{background:#F5F2EA}
+.rowdate{flex:none;width:78px;display:flex;flex-direction:column;gap:2px}
+.rowdate b{font-size:15px;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rowdate b.istoday{color:var(--accent)}
+.rowdate span{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.rowtext{font-size:15px;line-height:1.45;color:#3C423E;min-width:0;word-break:break-all;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.rowitem.past .rowtext{color:var(--muted)}
+.empty{text-align:center;color:var(--muted);font-size:13px;line-height:1.9;padding:40px 20px}
+.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:6px;font-weight:600}
+
+/* ---------- 底部标签栏 ---------- */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:20;
+  display:flex;justify-content:center;gap:6px;
+  padding:6px 10px calc(6px + env(safe-area-inset-bottom));
+  background:rgba(250,248,244,.92);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);
+}
+.tabbar-inner{display:flex;gap:6px;width:100%;max-width:340px}
+.tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:8px 4px 6px;border:0;background:none;border-radius:10px;
+  font:inherit;font-size:12px;color:var(--muted);cursor:pointer;
+}
+.tab.active{color:var(--accent);font-weight:650}
+.tab svg{width:20px;height:20px}
+
+/* ---------- 编辑抽屉 ---------- */
+.mask{
+  position:fixed;inset:0;z-index:40;background:rgba(20,22,20,.42);
+  opacity:0;pointer-events:none;transition:opacity .22s ease;
+}
+.mask.on{opacity:1;pointer-events:auto}
+.sheet{
+  position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:540px;
+  background:#FFFDF8;border-radius:20px 20px 0 0;
+  padding:16px 18px calc(18px + env(safe-area-inset-bottom));
+  transform:translateY(102%);
+  transition:transform .28s cubic-bezier(.22,.8,.2,1);
+  box-shadow:0 -12px 40px rgba(25,25,20,.18);
+}
+.mask.on .sheet{transform:translateY(0)}
+.grab{width:38px;height:4px;border-radius:2px;background:#D8D3C6;margin:0 auto 14px}
+.sheet-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:12px}
+.sheet-title{font-size:19px;font-weight:650;margin:0}
+.sheet-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.closebtn{width:34px;height:34px;flex:none;border:0;background:#F1EEE6;border-radius:50%;
+  display:grid;place-items:center;cursor:pointer;color:#5B5F59;padding:0}
+textarea{
+  width:100%;min-height:118px;resize:vertical;
+  border:1px solid var(--line);border-radius:12px;background:var(--card);
+  padding:12px 13px;font:inherit;font-size:16px;line-height:1.55;color:var(--ink);
+  outline:none;display:block;
+}
+textarea:focus{border-color:#C9C2B4}
+.sheet-foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:10px}
+.counter{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.btns{display:flex;gap:8px;align-items:center}
+.ghost{height:44px;padding:0 14px;border:0;background:#F1EEE6;color:#5B5F59;
+  border-radius:11px;font:inherit;font-size:14px;cursor:pointer}
+.ghost:active{background:#E7E2D6}
+.primary{height:44px;padding:0 22px;border:0;background:var(--ink);color:#FBF9F4;
+  border-radius:11px;font:inherit;font-size:15px;font-weight:650;cursor:pointer}
+.primary:active{background:#333A35}
+
+/* ---------- toast ---------- */
+.toast{
+  position:fixed;left:50%;bottom:96px;transform:translate(-50%,10px);
+  background:rgba(27,33,30,.92);color:#F6F4EF;font-size:13px;
+  padding:9px 16px;border-radius:20px;z-index:60;opacity:0;pointer-events:none;
+  transition:opacity .2s ease,transform .2s ease;white-space:nowrap;
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ========== 头部 ========== -->
+  <header class="head">
+    <div class="head-l">
+      <span class="year" id="yearTitle">2026</span>
+      <h1 class="month" id="monthTitle">11月</h1>
+    </div>
+    <div class="head-r">
+      <button class="navbtn" id="prevBtn" aria-label="上个月">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="navbtn" id="nextBtn" aria-label="下个月">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="subline">
+    <span id="countTip">本月 0 条备注</span>
+    <button class="todaybtn" id="todayBtn">回到今天</button>
+  </div>
+
+  <!-- ========== 月视图 ========== -->
+  <div id="monthView" style="display:flex;flex-direction:column;flex:1;min-height:0">
+    <div class="week">
+      <div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div><div>日</div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- ========== 备忘列表 ========== -->
+  <div class="viewlist" id="listView">
+    <div class="tools">
+      <div class="searchbox">
+        <svg viewBox="0 0 24 24" width="17" height="17"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input id="search" type="search" placeholder="搜索备注内容" autocomplete="off">
+      </div>
+      <button class="iconbtn" id="exportBtn" aria-label="导出备份" title="导出备份">
+        <svg viewBox="0 0 24 24" width="19" height="19"><path d="M12 16V4m0 0-4 4m4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <button class="iconbtn" id="importBtn" aria-label="导入备份" title="导入备份">
+        <svg viewBox="0 0 24 24" width="19" height="19"><path d="M12 4v12m0 0-4-4m4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <input type="file" id="fileInput" accept=".json,application/json" style="display:none">
+    </div>
+    <div class="rows" id="rows"></div>
+  </div>
+</div>
+
+<!-- ========== 底部标签栏 ========== -->
+<nav class="tabbar">
+  <div class="tabbar-inner">
+    <button class="tab active" id="tabMonth">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/></svg>
+      <span>月历</span>
+    </button>
+    <button class="tab" id="tabList">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 6h14M5 12h14M5 18h9" stroke-linecap="round"/></svg>
+      <span>备忘</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ========== 编辑抽屉 ========== -->
+<div class="mask" id="mask">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="grab"></div>
+    <div class="sheet-head">
+      <div>
+        <h2 class="sheet-title" id="sheetTitle">11月12日</h2>
+        <div class="sheet-sub" id="sheetSub"></div>
+      </div>
+      <button class="closebtn" id="closeBtn" aria-label="关闭">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <textarea id="noteInput" maxlength="500"></textarea>
+    <div class="sheet-foot">
+      <div class="counter" id="counter">0 / 500</div>
+      <div class="btns">
+        <button class="ghost" id="clearBtn">清空</button>
+        <button class="primary" id="saveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var KEY = "calNotes.v1";
+  var WK = ["日","一","二","三","四","五","六"];
+  var notes = {};
+
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) { notes = JSON.parse(raw) || {}; }
+  } catch(e) { notes = {}; }
+
+  var now = new Date();
+  var todayKey = keyOf(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // 清掉旧版本自动写入的引导备注，保持日历干净
+  Object.keys(notes).forEach(function(k){
+    if (notes[k] === "点格子就能写备注") delete notes[k];
+  });
+
+  var view = { y: now.getFullYear(), m: now.getMonth() };
+  var selectedKey = null;
+  var currentView = "month";
+
+  var $ = function(id){ return document.getElementById(id); };
+  var grid = $("grid"), rows = $("rows"), mask = $("mask"),
+      noteInput = $("noteInput"), counter = $("counter"), toastEl = $("toast");
+
+  function pad(n){ return n < 10 ? "0" + n : "" + n; }
+  function keyOf(y,m,d){ return y + "-" + pad(m+1) + "-" + pad(d); }
+  function keyFromDate(dt){ return keyOf(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
+  function esc(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  function save(){
+    try { localStorage.setItem(KEY, JSON.stringify(notes)); }
+    catch(e){ toast("存储空间不足，保存失败"); }
+  }
+  var toastTimer = null;
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add("on");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove("on"); }, 1800);
+  }
+
+  /* ---------- 月视图渲染 ---------- */
+  function renderMonth(){
+    $("yearTitle").textContent = view.y;
+    $("monthTitle").textContent = (view.m + 1) + "月";
+
+    var first = new Date(view.y, view.m, 1);
+    var offset = (first.getDay() + 6) % 7; // 周一为第一天
+    var daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
+    var rowCount = Math.ceil((offset + daysInMonth) / 7);
+    var start = new Date(view.y, view.m, 1 - offset);
+    var html = "";
+    var monthCount = 0;
+
+    for (var i = 0; i < rowCount * 7; i++) {
+      var d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      var k = keyFromDate(d);
+      var inMonth = d.getMonth() === view.m;
+      var isToday = k === todayKey;
+      var dow = d.getDay();
+      var note = notes[k] || "";
+      if (inMonth && note) monthCount++;
+
+      html += '<button class="cell' + (inMonth ? "" : " other") +
+              (isToday ? " today" : "") +
+              (note ? " hasnote" : "") +
+              ((dow === 0 || dow === 6) ? " wkend" : "") +
+              '" data-k="' + k + '" aria-label="' + (d.getMonth()+1) + "月" + d.getDate() + "日" +
+              (note ? "，备注：" + esc(note) : "") + '">' +
+              '<span class="dnum">' + d.getDate() + '</span>' +
+              (note ? '<span class="dnote">' + esc(note) + '</span>' : "") +
+              '</button>';
+    }
+    grid.innerHTML = html;
+    $("countTip").textContent = "本月 " + monthCount + " 条备注";
+  }
+
+  /* ---------- 备忘列表渲染（只列当前月份的备注） ---------- */
+  function renderList(){
+    var q = $("search").value.trim().toLowerCase();
+    var monthPrefix = view.y + "-" + pad(view.m + 1) + "-";
+    var keys = Object.keys(notes).filter(function(k){
+      return notes[k] && k.indexOf(monthPrefix) === 0;
+    }).sort();
+    var filtered = keys.filter(function(k){
+      if (!q) return true;
+      var txt = notes[k].toLowerCase();
+      return txt.indexOf(q) > -1 || k.indexOf(q) > -1;
+    });
+    $("countTip").textContent = "本月 " + filtered.length + " 条备注";
+
+    if (!filtered.length) {
+      rows.innerHTML = '<div class="empty"><b>' +
+        (q ? "本月没有找到相关备注" : "本月还没有备注") +
+        '</b>' + (q ? "换个关键词试试" : "回到月历，点任意日期就能写一条") + '</div>';
+      return;
+    }
+
+    var html = "";
+    filtered.forEach(function(k){
+      var parts = k.split("-");
+      var y = +parts[0], m = +parts[1], dd = +parts[2];
+      var dt = new Date(y, m - 1, dd);
+      var past = k < todayKey;
+      html += '<div class="rowwrap" data-k="' + k + '">' +
+        '<div class="rowdel"><button class="delbtn" data-del="' + k + '">删除</button></div>' +
+        '<button class="rowitem' + (past ? " past" : "") + '" data-k="' + k + '">' +
+        '<span class="rowdate"><b class="' + (k === todayKey ? "istoday" : "") + '">' + m + "月" + dd + '日</b>' +
+        '<span>星期' + WK[dt.getDay()] + '</span></span>' +
+        '<span class="rowtext">' + esc(notes[k]) + '</span>' +
+        '</button>' +
+        '</div>';
+    });
+    rows.innerHTML = html;
+  }
+
+  function renderAll(){
+    // 备忘列表也跟随月份，所以表头在两种视图下都要刷新
+    $("yearTitle").textContent = view.y;
+    $("monthTitle").textContent = (view.m + 1) + "月";
+    if (currentView === "month") renderMonth(); else renderList();
+  }
+
+  /* ---------- 抽屉 ---------- */
+  function openSheet(k){
+    selectedKey = k;
+    var parts = k.split("-");
+    var y = +parts[0], m = +parts[1], dd = +parts[2];
+    var dt = new Date(y, m - 1, dd);
+    $("sheetTitle").textContent = m + "月" + dd + "日";
+    $("sheetSub").textContent = y + "年 · 星期" + WK[dt.getDay()] +
+      (k === todayKey ? " · 今天" : "") +
+      (dt.getMonth() !== now.getMonth() || y !== now.getFullYear() ? "" : "");
+    noteInput.value = notes[k] || "";
+    updateCounter();
+    mask.classList.add("on");
+  }
+  function closeSheet(){
+    mask.classList.remove("on");
+    noteInput.blur();
+    selectedKey = null;
+  }
+  function updateCounter(){
+    counter.textContent = noteInput.value.length + " / 500";
+  }
+
+  /* ---------- 事件绑定 ---------- */
+  grid.addEventListener("click", function(e){
+    if (suppressClick) { suppressClick = false; return; }
+    var cell = e.target.closest(".cell");
+    if (!cell) return;
+    openSheet(cell.dataset.k);
+  });
+  rows.addEventListener("click", function(e){
+    var del = e.target.closest(".delbtn");
+    if (del) { deleteNote(del.getAttribute("data-del")); return; }
+    var item = e.target.closest(".rowitem");
+    if (!item) return;
+    if (rowSuppressClick) { rowSuppressClick = false; return; }
+    if (item.classList.contains("open")) { item.classList.remove("open"); return; }
+    openSheet(item.dataset.k);
+  });
+
+  /* 备忘单条左滑删除 */
+  var rowSuppressClick = false;
+  var rowSwipe = { el: null, startX: 0, startY: 0, baseX: 0, dx: 0, moved: false };
+
+  function closeOpenRows(except){
+    var open = rows.querySelectorAll(".rowitem.open");
+    for (var i = 0; i < open.length; i++) {
+      if (open[i] !== except) {
+        open[i].classList.remove("open");
+        open[i].style.transform = "";
+      }
+    }
+  }
+
+  rows.addEventListener("pointerdown", function(e){
+    if (e.target.closest(".delbtn")) return;
+    var item = e.target.closest(".rowitem");
+    if (!item) return;
+    rowSwipe.el = item;
+    rowSwipe.startX = e.clientX;
+    rowSwipe.startY = e.clientY;
+    rowSwipe.baseX = item.classList.contains("open") ? -82 : 0;
+    rowSwipe.dx = rowSwipe.baseX;
+    rowSwipe.moved = false;
+    try { item.setPointerCapture(e.pointerId); } catch(err) {}
+  });
+
+  rows.addEventListener("pointermove", function(e){
+    var item = rowSwipe.el;
+    if (!item) return;
+    var dx = e.clientX - rowSwipe.startX;
+    var dy = e.clientY - rowSwipe.startY;
+    if (!rowSwipe.moved) {
+      if (Math.abs(dx) < 8 || Math.abs(dx) <= Math.abs(dy)) return;
+      rowSwipe.moved = true;
+      item.classList.add("dragging");
+      closeOpenRows(item);
+    }
+    var v = rowSwipe.baseX + dx;
+    if (v > 0) v = 0;
+    if (v < -100) v = -100 + (v + 100) * 0.3;
+    if (v < -132) v = -132;
+    item.style.transform = "translateX(" + v + "px)";
+    rowSwipe.dx = v;
+  });
+
+  function endSwipe(){
+    var item = rowSwipe.el;
+    if (!item) return;
+    item.classList.remove("dragging");
+    item.style.transform = "";
+    if (rowSwipe.moved) {
+      if (rowSwipe.dx < -46) item.classList.add("open");
+      else item.classList.remove("open");
+      rowSuppressClick = true;
+      setTimeout(function(){ rowSuppressClick = false; }, 400);
+    }
+    rowSwipe.el = null;
+    rowSwipe.moved = false;
+  }
+  rows.addEventListener("pointerup", endSwipe);
+  rows.addEventListener("pointercancel", endSwipe);
+
+  function deleteNote(k){
+    if (!k || !notes[k]) return;
+    delete notes[k];
+    save();
+    renderList();
+    toast("已删除");
+  }
+
+  /* 左右滑动切月 */
+  var tx = 0, ty = 0, suppressClick = false;
+  grid.addEventListener("touchstart", function(e){
+    tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+  }, { passive: true });
+  grid.addEventListener("touchend", function(e){
+    var dx = e.changedTouches[0].clientX - tx;
+    var dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) > 62 && Math.abs(dx) > Math.abs(dy) * 1.7) {
+      if (dx < 0) goMonth(1); else goMonth(-1);
+      suppressClick = true;
+    }
+  }, { passive: true });
+
+  function goMonth(delta){
+    var d = new Date(view.y, view.m + delta, 1);
+    view.y = d.getFullYear();
+    view.m = d.getMonth();
+    renderAll();
+  }
+
+  $("prevBtn").addEventListener("click", function(){ goMonth(-1); });
+  $("nextBtn").addEventListener("click", function(){ goMonth(1); });
+  $("todayBtn").addEventListener("click", function(){
+    var n = new Date();
+    view.y = n.getFullYear(); view.m = n.getMonth();
+    if (currentView === "month") renderMonth(); else { switchView("month"); }
+    toast("已回到今天");
+  });
+
+  $("saveBtn").addEventListener("click", function(){
+    if (!selectedKey) return;
+    var v = noteInput.value.trim();
+    if (v) notes[selectedKey] = v; else delete notes[selectedKey];
+    save();
+    renderAll();
+    closeSheet();
+    toast(v ? "备注已保存" : "备注已删除");
+  });
+
+  $("clearBtn").addEventListener("click", function(){
+    noteInput.value = "";
+    updateCounter();
+    noteInput.focus();
+  });
+
+  noteInput.addEventListener("input", updateCounter);
+  $("closeBtn").addEventListener("click", closeSheet);
+  mask.addEventListener("click", function(e){ if (e.target === mask) closeSheet(); });
+  document.addEventListener("keydown", function(e){
+    if (e.key === "Escape" && mask.classList.contains("on")) closeSheet();
+  });
+
+  /* ---------- 视图切换 ---------- */
+  function switchView(v){
+    currentView = v;
+    var isMonth = v === "month";
+    $("monthView").style.display = isMonth ? "flex" : "none";
+    $("listView").style.display = isMonth ? "none" : "flex";
+    $("tabMonth").classList.toggle("active", isMonth);
+    $("tabList").classList.toggle("active", !isMonth);
+    renderAll();
+  }
+  $("tabMonth").addEventListener("click", function(){ switchView("month"); });
+  $("tabList").addEventListener("click", function(){ switchView("list"); });
+  $("search").addEventListener("input", renderList);
+
+  /* ---------- 备份 ---------- */
+  $("exportBtn").addEventListener("click", function(){
+    var data = JSON.stringify({ version: 1, notes: notes }, null, 2);
+    var blob = new Blob([data], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "日历备注备份-" + todayKey + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+    toast("备份已导出");
+  });
+
+  $("importBtn").addEventListener("click", function(){ $("fileInput").click(); });
+  $("fileInput").addEventListener("change", function(e){
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try {
+        var obj = JSON.parse(reader.result);
+        var incoming = obj && obj.notes ? obj.notes : obj;
+        if (!incoming || typeof incoming !== "object") throw new Error("格式不对");
+        var added = 0;
+        Object.keys(incoming).forEach(function(k){
+          if (/^\d{4}-\d{2}-\d{2}$/.test(k) && typeof incoming[k] === "string") {
+            notes[k] = incoming[k]; added++;
+          }
+        });
+        save();
+        renderAll();
+        toast("已导入 " + added + " 条备注");
+      } catch(err) {
+        toast("导入失败：文件格式不正确");
+      }
+      e.target.value = "";
+    };
+    reader.readAsText(file, "utf-8");
+  });
+
+  /* ---------- 启动 ---------- */
+  save();
+  renderMonth();
+})();
+</script>
+</body>
+</html>
